@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!--
+      Подключение Web App Manifest.
+      Этот файл сообщает браузеру базовые сведения о приложении:
+      название, иконки, режим отображения, цвета темы и стартовый URL.
+    -->
+  <link rel="manifest" href="./manifest.json" />
+
+  <!-- Базовые meta-настройки для PWA и мобильных браузеров -->
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Учебный TODO" />
+
+  <!-- Локальные иконки. Важно: пути должны совпадать с реальной структурой проекта. -->
+  <link rel="icon" type="image/x-icon" href="./assets/icons/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="16x16" href="./assets/icons/favicon-16x16.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/icons/favicon-32x32.png" />
+  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
+
+  <!-- Подключаем локальные стили: это важно и для офлайн-режима, и для предсказуемости примера -->
+  <link rel="stylesheet" href="./styles.css" />
+
+  <title>Учебный TODO-менеджер</title>
+</head>
+
+<body>
+  <!--
+      Общая обёртка страницы.
+      Нужна, чтобы удобно построить вертикальный макет:
+      header -> main -> footer.
+    -->
+  <div class="page">
+    <!-- ========================= -->
+    <!-- ХЕДЕР                     -->
+    <!-- ========================= -->
+    <header class="site-header">
+      <section class="hero">
+        <!--
+            Статическая картинка в начале страницы.
+            Это часть задания по оформлению интерфейса статическими элементами.
+          -->
+        <div class="hero__image-wrapper">
+          <img class="hero__image" src="./assets/hero.png"
+            alt="Мотивационная иллюстрация для учебного TODO-приложения" />
+        </div>
+
+        <div class="hero__content">
+          <p class="hero__eyebrow">ПРАКТИКИ 13–14</p>
+          <h1 class="hero__title">Учебный TODO-менеджер</h1>
+          <p class="hero__text">
+            Заготовка под Service Worker, Web App Manifest, offline-first,
+            локальное хранилище браузера и установку приложения как PWA.
+          </p>
+
+          <!--
+              Бейджи и служебные кнопки.
+              Здесь же отображается сетевой статус и кнопка установки PWA.
+            -->
+          <div class="hero__controls">
+            <span class="badge">HTML</span>
+            <span class="badge">CSS</span>
+            <span class="badge">JavaScript</span>
+            <span id="networkStatus" class="badge badge--success">Онлайн</span>
+
+            <!--
+                Кнопка установки PWA.
+                По умолчанию скрыта.
+                В Chromium-браузерах показывается после события beforeinstallprompt.
+                В Safari эта кнопка не используется: там установка выполняется через меню браузера.
+              -->
+            <button id="installBtn" class="button button--primary button--small" type="button" hidden>
+              Просто возьми и установи PWA!
+            </button>
+            <button id="updateBtn" hidden>Обновить приложение</button>
+          </div>
+
+          <!--
+              Отдельная учебная подсказка по установке.
+              Нужна, потому что механика отличается в Chromium и Safari.
+            -->
+          <p id="installHint" class="hero__hint">
+            Chrome / Edge: установка возможна через кнопку браузера или кнопку выше.
+            Safari: используйте File → Add to Dock.
+          </p>
+        </div>
+      </section>
+      <nav class="nav"
+        style="max-width: 980px; margin: 0 auto; padding: 0 16px 16px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn" data-page="home">Старт</button>
+        <button class="btn" data-page="theory">Теория</button>
+        <button class="btn" data-page="push">WebSocket/Push</button>
+      </nav>
+    </header>
+
+    <!-- ========================= -->
+    <!-- ОСНОВНОЕ СОДЕРЖИМОЕ       -->
+    <!-- ========================= -->
+    <main class="container">
+      <section class="card">
+        <h2 class="card__title">Просто добавь задачу!</h2>
+
+        <!--
+            Базовая форма добавления новой задачи.
+            Для учебного шаблона важна простая и читаемая структура.
+          -->
+        <form id="taskForm" class="task-form">
+          <label class="visually-hidden" for="taskInput">Текст задачи</label>
+          <input id="taskInput" class="input" name="task" type="text" maxlength="120"
+            placeholder="Например: Просто сделай это!" autocomplete="off" required />
+          <button class="button button--primary" type="submit">Просто добавь это!</button>
+        </form>
+
+        <p class="card__hint">
+          Данные списка хранятся в <code>localStorage</code>, а статические ресурсы
+          должны оставаться доступными и при отсутствии сети.
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">Посмотри сколько у тебя задач! Просто сделай их!</h2>
+          <button id="clearCompletedBtn" class="button button--secondary" type="button">
+            Просто удали выполненные!
+          </button>
+        </div>
+        <div class="filters">
+          <button data-filter="all">Все</button>
+          <button data-filter="active">Активные</button>
+          <button data-filter="completed">Выполненные</button>
+        </div>
+        <div id="taskStats" class="stats">Всего: 0 | Активных: 0 | Выполненных: 0</div>
+
+        <!--
+            Сюда JavaScript динамически отрисовывает список задач.
+            Пока список пуст, показывается отдельное пустое состояние.
+          -->
+        <ul id="taskList" class="task-list"></ul>
+      </section>
+
+      <section class="card">
+        <h2 class="card__title">Что студенту нужно доделать</h2>
+        <ol class="todo-points">
+          <li>Реализовать редактирование существующей задачи.</li>
+          <li>Добавить фильтрацию: все / активные / выполненные.</li>
+          <li>Улучшить стратегию кэширования в <code>sw.js</code>.</li>
+          <li>Проверить установку PWA в Chromium и Safari.</li>
+          <li>Просто возьми и сделай это!</li>
+        </ol>
+        <p class="card__hint">
+          Полный список доработок и контрольных вопросов смотрите в файле <code>STUDENT_TASKS.md</code>.
+        </p>
+      </section>
+    </main>
+
+    <!-- ========================= -->
+    <!-- ФУТЕР                     -->
+    <!-- ========================= -->
+    <footer class="site-footer">
+      <div class="site-footer__content">
+        <div>
+          <p class="site-footer__title">Учебный репозиторий</p>
+          <p class="site-footer__text">
+            Практика по теме PWA: Service Worker, Web App Manifest, установка приложения,
+            офлайн-режим и локальное хранение данных.
+          </p>
+        </div>
+
+        <div class="quote-box">
+          <p class="quote-box__label">Случайная цитата о планировании</p>
+          <blockquote id="quoteText" class="quote-box__text">
+            Хороший план сегодня лучше идеального плана завтра.
+          </blockquote>
+          <button id="newQuoteBtn" class="button button--ghost button--small" type="button">
+            Просто покажи другую цитату!
+          </button>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Основная логика приложения -->
+  <script src="./app.js"></script>
+</body>
+
+</html>
