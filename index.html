@@ -98,6 +98,13 @@
         <button class="btn" data-page="theory">Теория</button>
         <button class="btn" data-page="push">WebSocket/Push</button>
       </nav>
+      <button id="pushBtn" class="button button--primary button--small">
+        Подписаться на уведомления
+      </button>
+      <button onclick="fetch('/api/push/test',{method:'POST'})">
+        Тест push
+      </button>
+      <main id="contentView" style="max-width: 980px; margin: 0 auto; padding: 0 16px 16px;"></main>
     </header>
 
     <!-- ========================= -->
@@ -187,6 +194,7 @@
   </div>
 
   <!-- Основная логика приложения -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="./app.js"></script>
 </body>
 

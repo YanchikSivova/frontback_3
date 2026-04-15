@@ -115,18 +115,55 @@ app.post('/api/push/test', async (req, res) => {
   });
 
   let sent = 0;
+  // for (const raw of Array.from(subscriptions)) {
+  //   const subscription = JSON.parse(raw);
+  //   try {
+  //     await sendNotification(subscription, payload);
+  //     sent++;
+  //   } catch (e) {
+  //     const code = e.statusCode;
+
+  //     console.warn('[PUSH] send failed:', code || '', e.body || e.message);
+
+  //     // ❗ ВАЖНО: удалить отвалившиеся подписки
+  //     if (code === 410 || code === 404) {
+  //       subscriptions.delete(raw);
+  //       console.log('[PUSH] cleaned subscription, left:', subscriptions.size);
+  //     }
+  //   }
+  // }
+
+
+
   for (const raw of Array.from(subscriptions)) {
     const subscription = JSON.parse(raw);
+
     try {
       await sendNotification(subscription, payload);
       sent++;
     } catch (e) {
-      // TODO (студентам): при 410 удалять подписку
-      console.warn('[PUSH] send failed:', e.statusCode || '', e.body || e.message);
+      const code = e.statusCode;
+
+      console.warn('[PUSH] send failed:', code || '', e.body || e.message);
+
+      if (code === 410 || code === 404) {
+        console.log('[PUSH] removing expired subscription');
+
+        // ✔ УДАЛЕНИЕ ЧЕРЕЗ СРАВНЕНИЕ JSON (безопасно для Set)
+        subscriptions.forEach((item) => {
+          const parsed = JSON.parse(item);
+          if (parsed.endpoint === subscription.endpoint) {
+            subscriptions.delete(item);
+          }
+        });
+      }
     }
   }
-
   res.json({ ok: true, sent, total: subscriptions.size });
+});
+
+app.get('/api/vapidPublicKey', (req, res) => {
+  res.json({ key: process.env.VAPID_PUBLIC_KEY });
 });
 
 // --- HTTPS server ---

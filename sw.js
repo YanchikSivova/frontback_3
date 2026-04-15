@@ -35,7 +35,11 @@ const ASSETS_TO_CACHE = [
   './assets/icons/apple-touch-icon-57x57.png',
   './assets/icons/apple-touch-icon-114x114.png',
   './assets/icons/apple-touch-icon-120x120.png',
-  './assets/icons/apple-touch-icon.png'
+  './assets/icons/apple-touch-icon.png',
+  './content/home.html',
+  './content/push.html',
+  './content/theory.html'
+
 ];
 
 /**
@@ -81,17 +85,41 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-
-      return fetch(event.request).then((networkResponse) => {
-        return caches.open(RUNTIME_CACHE).then(cache => {
+    fetch(event.request)
+      .then((networkResponse) => {
+        return caches.open(RUNTIME_CACHE).then((cache) => {
           cache.put(event.request, networkResponse.clone());
           return networkResponse;
         });
-      });
-    }).catch(() => {
-      return caches.match('./offline.html');
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      })
+  );
+});
+
+self.addEventListener('push', (event) => {
+  let data = {};
+
+  try {
+    data = event.data.json();
+  } catch {
+    data = { title: 'Push', body: 'Нет данных' };
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/assets/icons/favicon-192x192.png',
+      data: { url: data.url || '/' }
     })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  event.waitUntil(
+    clients.openWindow(event.notification.data.url)
   );
 });

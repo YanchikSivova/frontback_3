@@ -33,7 +33,13 @@ const installHint = document.getElementById('installHint');
 const quoteText = document.getElementById('quoteText');
 const newQuoteBtn = document.getElementById('newQuoteBtn');
 const updateBtn = document.getElementById('updateBtn');
+const pushBtn = document.getElementById('pushBtn');
 
+const socket = io('https://localhost:3443');
+
+socket.on('connect', () => {
+  console.log('WS подключен');
+});
 // =========================================================
 // Константы приложения
 // =========================================================
@@ -119,10 +125,10 @@ function generateId() {
  * navigator.onLine даёт базовую информацию, которой хватает для учебной демонстрации.
  */
 async function isReallyOnline() {
-  if (!navigator.onLine){
+  if (!navigator.onLine) {
     // console.log("offline")
     return false;
-  } 
+  }
   try {
     const response = await fetch('./manifest.json', {
       cache: 'no-store'
@@ -362,6 +368,7 @@ function addTask(text) {
   tasks.unshift(newTask);
   saveTasks(tasks);
   renderTasks();
+  socket.emit('todo:event', newTask);
 }
 
 /**
@@ -381,6 +388,7 @@ function toggleTask(taskId) {
 
   saveTasks(updated);
   renderTasks();
+  socket.emit('todo:event', { type: 'toggle' });
 }
 
 /**
@@ -393,6 +401,10 @@ function deleteTask(taskId) {
   const updated = loadTasks().filter(task => task.id !== taskId);
   saveTasks(updated);
   renderTasks();
+  socket.emit('todo:event', {
+    type: 'delete',
+    id: taskId
+  });
 }
 
 /**
@@ -404,6 +416,7 @@ function clearCompletedTasks() {
   const updated = loadTasks().filter(task => !task.completed);
   saveTasks(updated);
   renderTasks();
+  socket.emit('todo:event', { type: 'clear' });
 }
 // =========================================================
 // Установка PWA
@@ -612,12 +625,33 @@ function init() {
 }
 
 init();
+socket.on('todo:event', (event) => {
+  const tasks = loadTasks();
 
+  if (event.type === 'delete') {
+    const updated = tasks.filter(t => t.id !== event.id);
+    saveTasks(updated);
+    renderTasks();
+    return;
+  }
+
+  if (event.type === 'toggle') {
+    renderTasks();
+    return;
+  }
+
+  // CREATE (новая задача)
+  if (event.id && !tasks.find(t => t.id === event.id)) {
+    tasks.unshift(event);
+    saveTasks(tasks);
+    renderTasks();
+  }
+});
 const contentViewEl = document.getElementById('contentView');
 
 async function loadPage(page) {
   // page: 'home' | 'theory' | 'push'
-  const url = `/content/${page}.html`;
+  const url = `./content/${page}.html`;
 
   try {
     const res = await fetch(url, { cache: 'no-store' });
@@ -646,6 +680,47 @@ document.querySelectorAll('button[data-page]').forEach((btn) => {
 // По умолчанию показываем стартовую страницу
 loadPage('home');
 
+async function subscribeToPush() {
+  const permission = await Notification.requestPermission();
+
+  if (permission !== 'granted') {
+    alert('Нет разрешения');
+    return;
+  }
+
+  const reg = await navigator.serviceWorker.ready;
+
+  const res = await fetch('/api/vapidPublicKey');
+  const { key } = await res.json();
+
+  const subscription = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(key)
+
+  });
+  console.log(subscription);     
+
+  await fetch('https://localhost:3443/api/push/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription)
+  });
+
+  alert('Подписка оформлена!');
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+socket.on('todo:event', () => {
+  renderTasks();
+});
+
+pushBtn.addEventListener('click', subscribeToPush);
 // =========================
 // Практика 16: WebSocket + Push (заготовки)
 // =========================
