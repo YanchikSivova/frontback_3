@@ -507,43 +507,43 @@ window.addEventListener('appinstalled', () => {
 /**
  * Регистрируем Service Worker только там, где технология поддерживается.
  */
-function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) {
-    console.warn('Service Worker не поддерживается в данном браузере.');
-    return;
-  }
+// function registerServiceWorker() {
+//   if (!('serviceWorker' in navigator)) {
+//     console.warn('Service Worker не поддерживается в данном браузере.');
+//     return;
+//   }
 
-  window.addEventListener('load', async () => {
-    try {
-      const registration = await navigator.serviceWorker.register('./sw.js');
-      console.log('Service Worker зарегистрирован:', registration.scope);
-      /**
-       * TODO для студентов:
-       * 1. Добавить интерфейсное уведомление о том, что офлайн-режим готов.
-       * 2. Обработать сценарий появления новой версии Service Worker.
-       * 3. Показать пользователю кнопку "Обновить приложение".
-      */
-      // alert('Офлайн-режим готов! Приложение может работать без интернета.');
-      registration.onupdatefound = () => {
-        const newWorker = registration.installing;
+//   window.addEventListener('load', async () => {
+//     try {
+//       const registration = await navigator.serviceWorker.register('./sw.js');
+//       console.log('Service Worker зарегистрирован:', registration.scope);
+//       /**
+//        * TODO для студентов:
+//        * 1. Добавить интерфейсное уведомление о том, что офлайн-режим готов.
+//        * 2. Обработать сценарий появления новой версии Service Worker.
+//        * 3. Показать пользователю кнопку "Обновить приложение".
+//       */
+//       // alert('Офлайн-режим готов! Приложение может работать без интернета.');
+//       registration.onupdatefound = () => {
+//         const newWorker = registration.installing;
 
-        newWorker.onstatechange = () => {
-          if (newWorker.state === 'installed') {
-            if (navigator.serviceWorker.controller) {
-              showUpdateButton();
-            }
-            if (!navigator.serviceWorker.controller) {
-              // первый запуск
-              alert('Офлайн-режим готов!');
-            }
-          }
-        };
-      };
-    } catch (error) {
-      console.error('Ошибка регистрации Service Worker:', error);
-    }
-  });
-}
+//         newWorker.onstatechange = () => {
+//           if (newWorker.state === 'installed') {
+//             if (navigator.serviceWorker.controller) {
+//               showUpdateButton();
+//             }
+//             if (!navigator.serviceWorker.controller) {
+//               // первый запуск
+//               alert('Офлайн-режим готов!');
+//             }
+//           }
+//         };
+//       };
+//     } catch (error) {
+//       console.error('Ошибка регистрации Service Worker:', error);
+//     }
+//   });
+// }
 
 function showUpdateButton() {
   if (updateBtn) {
@@ -680,34 +680,34 @@ document.querySelectorAll('button[data-page]').forEach((btn) => {
 // По умолчанию показываем стартовую страницу
 loadPage('home');
 
-async function subscribeToPush() {
-  const permission = await Notification.requestPermission();
+// async function subscribeToPush() {
+//   const permission = await Notification.requestPermission();
 
-  if (permission !== 'granted') {
-    alert('Нет разрешения');
-    return;
-  }
+//   if (permission !== 'granted') {
+//     alert('Нет разрешения');
+//     return;
+//   }
 
-  const reg = await navigator.serviceWorker.ready;
+//   const reg = await navigator.serviceWorker.ready;
 
-  const res = await fetch('/api/vapidPublicKey');
-  const { key } = await res.json();
+//   const res = await fetch('/api/push/vapid-public-key');
+//   const { key } = await res.json();
 
-  const subscription = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(key)
+//   const subscription = await reg.pushManager.subscribe({
+//     userVisibleOnly: true,
+//     applicationServerKey: urlBase64ToUint8Array(key)
 
-  });
-  console.log(subscription);     
+//   });
+//   console.log(subscription);     
 
-  await fetch('https://localhost:3443/api/push/subscribe', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(subscription)
-  });
+//   await fetch('https://localhost:3443/api/push/subscribe', {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(subscription)
+//   });
 
-  alert('Подписка оформлена!');
-}
+//   alert('Подписка оформлена!');
+// }
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -720,33 +720,172 @@ socket.on('todo:event', () => {
   renderTasks();
 });
 
-pushBtn.addEventListener('click', subscribeToPush);
-// =========================
-// Практика 16: WebSocket + Push (заготовки)
-// =========================
+pushBtn.addEventListener('click', async () => {
+  const reg = await navigator.serviceWorker.ready;
+  await subscribePush(reg);
+});
+
 
 /**
- * TODO (Практика 16): WebSocket
+ * app.js (Практика 17)
  *
- * Сервер уже принимает Socket.IO соединения (server/src/server.js).
- * В учебной заготовке мы НЕ подключаем socket.io-client автоматически,
- * чтобы студенты сделали это сами.
+ * Клиент — обычный HTML+JS (без React/Vite).
  *
- * Вариант:
- * 1) Подключить socket.io-client (через npm или через CDN)
- * 2) При добавлении/изменении/удалении задач отправлять событие:
- *    socket.emit('todo:event', {...})
- * 3) На socket.on('todo:event', ...) обновлять UI.
+ * Идея практики:
+ * 1) PWA работает по HTTPS (сервер раздаёт эту статику).
+ * 2) Браузер подписывается на Push (PushSubscription).
+ * 3) Сервер умеет отправлять Push сразу (test) и с задержкой (reminder schedule).
+ * 4) В уведомлении есть action "Отложить на 5 минут" → Service Worker вызывает /api/reminders/snooze.
+ *
+ * Важно: здесь намеренно минимальный UI.
+ * TODO (студентам): улучшить вёрстку, валидацию, список напоминаний и т.п.
  */
 
-/**
- * TODO (Практика 16): Push API
- *
- * 1) Запросить разрешение Notification.requestPermission()
- * 2) Получить registration Service Worker
- * 3) registration.pushManager.subscribe(...)
- * 4) Отправить subscription на сервер: POST /api/push/subscribe
- * 5) Протестировать отправку: POST /api/push/test
- *
- * При получении push события логика в sw.js (см. push event).
- */
+const $ = (sel) => document.querySelector(sel);
+
+// Адрес API относительный, потому что клиент открывается с сервера:
+// https://localhost:3443/  →  /api/... это тот же origin
+const API = {
+  health: () => fetch('/api/health').then((r) => r.json()),
+
+  // PUSH
+  vapidPublicKey: () => fetch('/api/push/vapid-public-key').then((r) => r.json()),
+  subscribe: (sub) => fetch('/api/push/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sub),
+  }).then((r) => r.json()),
+  pushTest: () => fetch('/api/push/test', { method: 'POST' }).then((r) => r.json()),
+
+  // ================================
+  // ПР17: REMINDERS API (клиент → сервер)
+  // ================================
+  // scheduleReminder отправляет на сервер запрос:
+  // POST /api/reminders/schedule
+  // Сервер создаёт напоминание и ставит таймер (setTimeout).
+  // Когда таймер сработает — сервер отправит push всем подписчикам.
+  scheduleReminder: (payload) =>
+    fetch('/api/reminders/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then((r) => r.json()),
+};
+
+// --------------------------------------------------
+// VAPID public key приходит с сервера как строка (base64url).
+// Но pushManager.subscribe() требует applicationServerKey в виде Uint8Array.
+// Поэтому мы делаем техническую конвертацию base64url -> Uint8Array.
+// --------------------------------------------------
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+// --------------------------------------------------
+// База (ПР13–16): регистрируем Service Worker,
+// потому что PUSH уведомления приходят именно в SW (а не в обычный JS на странице).
+// --------------------------------------------------
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    log('Service Worker не поддерживается в этом браузере.');
+    return null;
+  }
+
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  log('SW зарегистрирован.');
+  return reg;
+}
+
+function log(msg) {
+  const el = $('#log');
+  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent;
+}
+
+async function ensurePushPermission() {
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') {
+    throw new Error('Разрешение на уведомления не выдано');
+  }
+}
+
+// --------------------------------------------------
+// База (ПР16) + нужна для ПР17:
+// 1) просим разрешение Notifications
+// 2) берём VAPID public key с сервера
+// 3) создаём push-subscription в браузере
+// 4) отправляем subscription на сервер
+//
+// Без этого шагa сервер НЕ сможет отправить push позже,
+// потому что ему некуда отправлять (нет subscription).
+// --------------------------------------------------
+
+async function subscribePush(reg) {
+  await ensurePushPermission();
+
+  const { publicKey } = await API.vapidPublicKey();
+  if (!publicKey) throw new Error('VAPID public key отсутствует. Проверьте server/.env');
+
+  const applicationServerKey = urlBase64ToUint8Array(publicKey);
+
+  // Создаём подписку в браузере
+  const subscription = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey,
+  });
+
+  // Сохраняем подписку на сервере
+  const res = await API.subscribe(subscription.toJSON());
+
+  log(`Подписка создана. На сервере подписок: ${res.count}`);
+}
+
+// --------------------------------------------------
+// ПР17: планируем уведомление.
+// Это НЕ отправка уведомления сейчас.
+// Это просьба к серверу: "отправь через delaySeconds".
+// Сервер вернёт reminder.id и рассчитает fireAt.
+// --------------------------------------------------
+
+async function scheduleReminder() {
+  console.log('SCHEDULE CLICKED');
+  const title = $('#rem-title').value.trim() || 'Напоминание';
+  const delaySeconds = Number($('#rem-delay').value || 30);
+
+  const res = await API.scheduleReminder({
+    title,
+    body: 'Отложенное уведомление (ПР17)',
+    delaySeconds,
+  });
+
+  if (res.error) {
+    log(`Ошибка schedule: ${res.message || res.error}`);
+    return;
+  }
+
+  log(`Запланировано: через ${delaySeconds} сек (id=${res.reminder.id})`);
+}
+
+// -----------------------
+// Инициализация UI
+// -----------------------
+
+(async function initPush() {
+  const reg = await registerServiceWorker();
+
+  const btnSchedule = document.getElementById('btn-schedule');
+
+  if (btnSchedule) {
+    btnSchedule.addEventListener('click', async () => {
+      try {
+        await scheduleReminder();
+      } catch (e) {
+        log(`Schedule error: ${e.message}`);
+      }
+    });
+  }
+})();

@@ -98,28 +98,100 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-self.addEventListener('push', (event) => {
-  let data = {};
+// self.addEventListener('push', (event) => {
+//   let data = {};
 
-  try {
-    data = event.data.json();
-  } catch {
-    data = { title: 'Push', body: 'Нет данных' };
+//   try {
+//     data = event.data.json();
+//   } catch {
+//     data = { title: 'Push', body: 'Нет данных' };
+//   }
+
+//   event.waitUntil(
+//     self.registration.showNotification(data.title, {
+//       body: data.body,
+//       icon: '/assets/icons/favicon-192x192.png',
+//       data: { url: data.url || '/' }
+//     })
+//   );
+// });
+
+// self.addEventListener('notificationclick', (event) => {
+//   event.notification.close();
+
+//   event.waitUntil(
+//     clients.openWindow(event.notification.data.url)
+//   );
+// });
+
+self.addEventListener('push', (event) => {
+  // event.data — полезная нагрузка, которую сервер отправил через web-push.
+  // Обычно это JSON строка → event.data.json()
+  // Иногда event.data может быть пустым, поэтому защищаемся.
+  const data = event.data ? event.data.json() : {};
+
+  // То, что увидит пользователь в уведомлении
+  const title = data.title || 'Напоминание';
+  const body = data.body || 'У вас новое уведомление';
+
+  // reminderId нужен для snooze — чтобы "отложить" именно конкретное напоминание
+  const reminderId = data.reminderId || null;
+
+  // actions: массив кнопок в уведомлении.
+  // Сервер может передать data.actions = ['snooze_5m'].
+  const actions = [];
+  if (Array.isArray(data.actions) && data.actions.includes('snooze_5m')) {
+    actions.push({ action: 'snooze_5m', title: 'Отложить на 5 минут' });
   }
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/assets/icons/favicon-192x192.png',
-      data: { url: data.url || '/' }
-    })
-  );
+  // options — настройки уведомления
+  const options = {
+  body,
+  icon: '/assets/icons/favicon-128x128.png',
+  badge: '/assets/icons/favicon-48x48.png',
+  data: {
+    url: data.url || '/',
+    reminderId,
+  },
+  actions,
+};
+
+  // event.waitUntil(...) — говорит браузеру:
+  // "не завершай обработку события, пока showNotification не выполнится".
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('notificationclick', (event) => {
+  // Закрываем уведомление сразу, чтобы оно не висело
   event.notification.close();
 
+  const { url, reminderId } = event.notification.data || {};
+
+  // 1) НОВОЕ (ПР17): нажали action "Отложить на 5 минут"
+  if (event.action === 'snooze_5m' && reminderId) {
+    // Service Worker может делать fetch на тот же origin.
+    // Мы открыты на https://localhost:3443 → значит fetch('/api/...') пойдёт туда же.
+    event.waitUntil(
+      fetch('/api/reminders/snooze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reminderId, minutes: 5 }),
+      }).catch(() => {
+        // TODO (студентам): логировать или показывать пользователю ошибку (если нужно)
+      })
+    );
+    return; // важно: не продолжаем открывать вкладку
+  }
+
+  // 2) База (ПР16): обычный клик по уведомлению → открыть/фокусировать вкладку
   event.waitUntil(
-    clients.openWindow(event.notification.data.url)
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Если вкладка уже открыта — фокусируем
+      for (const client of clientList) {
+        if (client.url.includes(url) && 'focus' in client) return client.focus();
+      }
+      // Иначе — открываем новую
+      if (clients.openWindow) return clients.openWindow(url || '/');
+    })
   );
 });

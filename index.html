@@ -111,6 +111,34 @@
     <!-- ОСНОВНОЕ СОДЕРЖИМОЕ       -->
     <!-- ========================= -->
     <main class="container">
+      <section class="card" style="margin-top: 16px; padding: 16px; border: 1px solid #ddd; border-radius: 12px;">
+        <h2 style="margin-top:0;">3) Напоминание (отложенная отправка)</h2>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label for="rem-title" style="font-size: 14px; color:#333;">Текст</label>
+            <input id="rem-title" class="input" type="text" placeholder="Например: Сдать практику"
+              style="min-width: 260px; padding: 10px;" />
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label for="rem-delay" style="font-size: 14px; color:#333;">Задержка (сек)</label>
+            <input id="rem-delay" class="input" type="number" value="30" min="1" style="width: 140px; padding: 10px;" />
+          </div>
+          <button id="btn-schedule" class="button button--primary" type="button">Запланировать</button>
+        </div>
+
+        <p style="color:#555; margin-top:10px;">
+          Сервер ставит таймер и отправляет push позже: <code>POST /api/reminders/schedule</code>.
+        </p>
+
+        <p style="color:#555; margin-top:10px;">
+          TODO (студентам): добавить action «Отложить на 5 минут» и обработать его в <code>sw.js</code>.
+        </p>
+      </section>
+      <section class="log" style="margin-top: 16px; padding: 16px; border: 1px solid #ddd; border-radius: 12px;">
+        <h2 style="margin-top:0;">Лог</h2>
+        <pre id="log"
+          style="white-space: pre-wrap; margin:0; background:#0b1220; color:#d7e2ff; padding:12px; border-radius:10px; min-height:120px;"></pre>
+      </section>
       <section class="card">
         <h2 class="card__title">Просто добавь задачу!</h2>
 
