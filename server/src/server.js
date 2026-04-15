@@ -10,19 +10,6 @@ const { Server } = require('socket.io');
 const { nanoid } = require('nanoid');
 const { configureWebPush, sendNotification } = require('./push');
 
-/**
- * Практика 15–16: HTTPS сервер
- *
- * Зачем HTTPS в PWA:
- * - Service Worker требует secure context (https) для большинства фич.
- * - Push API также требует secure context.
- *
- * Этот сервер:
- * 1) отдаёт статические файлы фронтенда (PWA)
- * 2) поднимает Socket.IO (WebSocket) канал
- * 3) даёт endpoints для Push подписки и отправки уведомлений
- */
-
 const app = express();
 const PORT = Number(process.env.PORT || 3443);
 
@@ -42,15 +29,7 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() });
 });
 
-// --- Push: учебное хранилище подписок (в памяти процесса) ---
-// TODO (студентам): заменить на БД/Redis, если усложняем проект.
 const subscriptions = new Set();
-// В учебном примере храним подписки в памяти процесса 
-// Подписка (PushSubscription) — это “адрес”, куда можно отправлять push именно этому браузеру на этом устройстве.
-
-// Настройка web-push (если ключи есть)
-// Подпись сервера, чтобы push-сервис (Chrome/Firefox push service) доверял запросам сервера.
-
 
 let pushReady = false;
 try {
@@ -64,20 +43,6 @@ try {
   console.warn('[PUSH] Not configured:', e.message);
 }
 
-// Если ключей нет → pushReady=false → /api/push/test вернёт ошибку push_not_configured.
-
-
-
-/**
- * Практика 16: сохранить push‑подписку
- * Клиент отправляет объект subscription (PushSubscription.toJSON())
- */
-
-// Как подписка попадает на сервер (endpoint /api/push/subscribe)
-// 1.	Клиент делает POST /api/push/subscribe и отправляет JSON подписки.
-// 2.	Сервер кладёт подписку в Set.
-// 3.	Сервер отвечает “ок, я запомнил”.
-
 app.post('/api/push/subscribe', (req, res) => {
   const subscription = req.body;
   if (!subscription) {
@@ -86,22 +51,6 @@ app.post('/api/push/subscribe', (req, res) => {
   subscriptions.add(JSON.stringify(subscription));
   res.json({ ok: true, count: subscriptions.size, pushReady });
 });
-
-/**
- * Практика 16: отправить тестовый push всем подписчикам
- *
- * TODO (студентам):
- * - сделать payload содержательным (title/body/url)
- * - обработать отвалившиеся подписки (410/404)
- */
-
-// Тест Push 
-// Как сервер отправляет push (endpoint /api/push/test)
-// 1.	Вы жмёте кнопку / делаете запрос POST /api/push/test.
-// 2.	Сервер берёт все сохранённые подписки. 
-// 3.	Для каждой подписки вызывает sendNotification(...) — это реальная отправка пуша через библиотеку web-push.
-// 4.	Браузер получает push (даже если вкладка закрыта, но браузер запущен).
-
 
 app.post('/api/push/test', async (req, res) => {
   if (!pushReady) {
@@ -116,25 +65,6 @@ app.post('/api/push/test', async (req, res) => {
   });
 
   let sent = 0;
-  // for (const raw of Array.from(subscriptions)) {
-  //   const subscription = JSON.parse(raw);
-  //   try {
-  //     await sendNotification(subscription, payload);
-  //     sent++;
-  //   } catch (e) {
-  //     const code = e.statusCode;
-
-  //     console.warn('[PUSH] send failed:', code || '', e.body || e.message);
-
-  //     // ❗ ВАЖНО: удалить отвалившиеся подписки
-  //     if (code === 410 || code === 404) {
-  //       subscriptions.delete(raw);
-  //       console.log('[PUSH] cleaned subscription, left:', subscriptions.size);
-  //     }
-  //   }
-  // }
-
-
 
   for (const raw of Array.from(subscriptions)) {
     const subscription = JSON.parse(raw);
@@ -167,46 +97,10 @@ app.get('/api/push/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
-// app.get('/api/vapidPublicKey', (req, res) => {
-//   res.json({ key: process.env.VAPID_PUBLIC_KEY });
-// });
-
-
-// ============================
-// ПР17: ОТЛОЖЕННЫЕ PUSH УВЕДОМЛЕНИЯ
-// ============================
-//
-// В ПР15–16 у нас была база для push:
-// - подписка клиента (subscription)
-// - хранение подписок на сервере (subscriptions)
-// - функция sendNotification(subscription, payload)
-//
-// В ПР17 добавляем НОВОЕ:
-// - планирование уведомления “через N секунд”
-// - endpoint /api/reminders/schedule
-// - endpoint /api/reminders/snooze (отложить на 5 минут по клику в уведомлении)
-//
-// Важно: здесь учебная реализация “в памяти”.
-// После перезапуска сервера всё исчезнет (и подписки, и запланированные напоминания).
-
-// reminders = "хранилище напоминаний" (как мини-БД в памяти процесса).
-// Ключ: reminder.id, Значение: объект reminder.
 const reminders = new Map();
 
-// reminderTimers = хранилище активных таймеров setTimeout(...) по reminder.id.
-// Зачем отдельно?
-// - чтобы уметь перепланировать (snooze) и отменять/перезаписывать старый таймер.
 const reminderTimers = new Map();
-/**
- * scheduleReminderTimer(reminder)
- *
- * Делает ровно одну вещь:
- * - ставит setTimeout, который через delayMs отправит PUSH всем подписчикам.
- *
- * Почему это отдельной функцией:
- * - потому что она используется и в /schedule (первичное планирование),
- *   и в /snooze (перепланирование).
- */
+
 function scheduleReminderTimer(reminder) {
   // 0) Если для этого reminder.id уже был таймер — удаляем его,
   // иначе получим ДВА уведомления: старое и новое.
@@ -247,9 +141,6 @@ function scheduleReminderTimer(reminder) {
         await sendNotification(subscription, payload);
         sent++;
       } catch (e) {
-        // Здесь часто бывает "subscription умерла" (410/404).
-        // В учебной версии мы просто логируем.
-        // TODO (студентам): при 410 удалять подписку из subscriptions.
         if (e.statusCode === 410 || e.statusCode === 404) {
           subscriptions.forEach((item) => {
             const parsed = JSON.parse(item);
@@ -267,22 +158,7 @@ function scheduleReminderTimer(reminder) {
   // 3) Сохраняем таймер по id (чтобы можно было отменять/перепланировать)
   reminderTimers.set(reminder.id, t);
 }
-/**
- * POST /api/reminders/schedule
- *
- * ПР17: планирование отложенного уведомления.
- *
- * Вход:
- * {
- *   "title": "Сдать практику",
- *   "body": "ПР17: через 30 сек",
- *   "delaySeconds": 30
- * }
- *
- * Выход:
- * - { ok: true, reminder: {...} }
- * - reminder.fireAt — конкретное время в будущем (timestamp)
- */
+
 app.post('/api/reminders/schedule', (req, res) => {
   const { title, body, delaySeconds } = req.body || {};
 
@@ -318,20 +194,7 @@ app.post('/api/reminders/schedule', (req, res) => {
   // 5) Отдаём клиенту результат
   res.json({ ok: true, reminder });
 });
-/**
- * POST /api/reminders/snooze
- *
- * ПР17: перепланирование ("Отложить на 5 минут").
- *
- * Этот endpoint вызывается НЕ из app.js, а из Service Worker,
- * когда пользователь нажал кнопку в уведомлении.
- *
- * Вход:
- * {
- *   "reminderId": "abc123",
- *   "minutes": 5
- * }
- */
+
 app.post('/api/reminders/snooze', (req, res) => {
   const { reminderId, minutes } = req.body || {};
 
@@ -358,11 +221,6 @@ app.post('/api/reminders/snooze', (req, res) => {
 
   res.json({ ok: true, reminder });
 });
-
-/**
- * TODO (студентам): добавить эндпоинт списка напоминаний
- * GET /api/reminders
- */
 
 app.get('/api/reminders', (req, res) => {
   res.json({
@@ -398,12 +256,8 @@ const io = new Server(httpsServer, {
 io.on('connection', (socket) => {
   console.log('[WS] connected:', socket.id);
 
-  // TODO (студентам): придумать события для TODO‑листа
-  // Например: 'todo:created', 'todo:toggled', 'todo:deleted'
-
   socket.on('todo:event', (payload) => {
-    // payload — что угодно (например объект задачи)
-    // Рассылаем всем остальным вкладкам/клиентам
+    
     socket.broadcast.emit('todo:event', payload);
   });
 

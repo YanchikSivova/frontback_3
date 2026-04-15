@@ -137,6 +137,18 @@ body {
   font-weight: 600;
 }
 
+.btn{
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(197,34,173, 0.25);
+  color: var(--text-main);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .badge--success {
   color: #bbf7d0;
   border-color: rgba(34, 197, 94, 0.35);
@@ -216,7 +228,7 @@ body {
   transform: translateY(-1px);
 }
 
-.button {
+.button, .testPush {
   min-height: 52px;
   padding: 0 18px;
   border: none;
@@ -235,13 +247,13 @@ body {
   transform: translateY(0);
 }
 
-.button--small {
+.button--small, .testPush {
   min-height: 42px;
   padding: 0 14px;
   font-size: 14px;
 }
 
-.button--primary {
+.button--primary, .testPush {
   color: white;
   background: linear-gradient(135deg, #2563eb, #3b82f6);
 }

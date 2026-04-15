@@ -93,7 +93,7 @@
         </div>
       </section>
       <nav class="nav"
-        style="max-width: 980px; margin: 0 auto; padding: 0 16px 16px; display:flex; gap:10px; flex-wrap:wrap;">
+        style="max-width: 980px; margin: 10px auto; padding: 0 16px 16px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn" data-page="home">Старт</button>
         <button class="btn" data-page="theory">Теория</button>
         <button class="btn" data-page="push">WebSocket/Push</button>
@@ -101,7 +101,7 @@
       <button id="pushBtn" class="button button--primary button--small">
         Подписаться на уведомления
       </button>
-      <button onclick="fetch('/api/push/test',{method:'POST'})">
+      <button class="testPush" onclick="fetch('/api/push/test',{method:'POST'})">
         Тест push
       </button>
       <main id="contentView" style="max-width: 980px; margin: 0 auto; padding: 0 16px 16px;"></main>

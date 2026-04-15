@@ -1,23 +1,3 @@
-/**
- * Учебный TODO-менеджер для практик 13–14.
- *
- * Что уже реализовано в шаблоне:
- * 1. Добавление, удаление и переключение статуса задач.
- * 2. Хранение задач в localStorage.
- * 3. Вывод статистики по задачам.
- * 4. Регистрация Service Worker.
- * 5. Поддержка установки PWA в Chromium-браузерах.
- * 6. Отдельная подсказка по установке в Safari.
- * 7. Случайные мотивационные цитаты в футере.
- *
- * Что оставлено студентам:
- * - редактирование задачи;
- * - фильтрация списка;
- * - подтверждение удаления;
- * - улучшение кэширования в Service Worker;
- * - более продуманная обработка обновлений PWA.
- */
-
 // =========================================================
 // DOM-элементы интерфейса
 // =========================================================
@@ -133,15 +113,12 @@ async function isReallyOnline() {
     const response = await fetch('./manifest.json', {
       cache: 'no-store'
     });
-    // console.log(response.ok);
     return response.ok;
   } catch {
-    // console.log("offline");
     return false;
   }
 }
 async function updateNetworkStatus() {
-  // const isOnline = navigator.onLine;
   const isOnline = await isReallyOnline();
 
   networkStatus.textContent = isOnline ? 'Онлайн' : 'Офлайн';
@@ -507,43 +484,29 @@ window.addEventListener('appinstalled', () => {
 /**
  * Регистрируем Service Worker только там, где технология поддерживается.
  */
-// function registerServiceWorker() {
-//   if (!('serviceWorker' in navigator)) {
-//     console.warn('Service Worker не поддерживается в данном браузере.');
-//     return;
-//   }
 
-//   window.addEventListener('load', async () => {
-//     try {
-//       const registration = await navigator.serviceWorker.register('./sw.js');
-//       console.log('Service Worker зарегистрирован:', registration.scope);
-//       /**
-//        * TODO для студентов:
-//        * 1. Добавить интерфейсное уведомление о том, что офлайн-режим готов.
-//        * 2. Обработать сценарий появления новой версии Service Worker.
-//        * 3. Показать пользователю кнопку "Обновить приложение".
-//       */
-//       // alert('Офлайн-режим готов! Приложение может работать без интернета.');
-//       registration.onupdatefound = () => {
-//         const newWorker = registration.installing;
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    log('Service Worker не поддерживается в этом браузере.');
+    return null;
+  }
 
-//         newWorker.onstatechange = () => {
-//           if (newWorker.state === 'installed') {
-//             if (navigator.serviceWorker.controller) {
-//               showUpdateButton();
-//             }
-//             if (!navigator.serviceWorker.controller) {
-//               // первый запуск
-//               alert('Офлайн-режим готов!');
-//             }
-//           }
-//         };
-//       };
-//     } catch (error) {
-//       console.error('Ошибка регистрации Service Worker:', error);
-//     }
-//   });
-// }
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  log('SW зарегистрирован.');
+  return reg;
+}
+
+function log(msg) {
+  const el = $('#log');
+  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent;
+}
+
+async function ensurePushPermission() {
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') {
+    throw new Error('Разрешение на уведомления не выдано');
+  }
+}
 
 function showUpdateButton() {
   if (updateBtn) {
@@ -680,35 +643,6 @@ document.querySelectorAll('button[data-page]').forEach((btn) => {
 // По умолчанию показываем стартовую страницу
 loadPage('home');
 
-// async function subscribeToPush() {
-//   const permission = await Notification.requestPermission();
-
-//   if (permission !== 'granted') {
-//     alert('Нет разрешения');
-//     return;
-//   }
-
-//   const reg = await navigator.serviceWorker.ready;
-
-//   const res = await fetch('/api/push/vapid-public-key');
-//   const { key } = await res.json();
-
-//   const subscription = await reg.pushManager.subscribe({
-//     userVisibleOnly: true,
-//     applicationServerKey: urlBase64ToUint8Array(key)
-
-//   });
-//   console.log(subscription);     
-
-//   await fetch('https://localhost:3443/api/push/subscribe', {
-//     method: 'POST',
-//     headers: { 'Content-Type': 'application/json' },
-//     body: JSON.stringify(subscription)
-//   });
-
-//   alert('Подписка оформлена!');
-// }
-
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -785,44 +719,6 @@ function urlBase64ToUint8Array(base64String) {
   for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
   return outputArray;
 }
-
-// --------------------------------------------------
-// База (ПР13–16): регистрируем Service Worker,
-// потому что PUSH уведомления приходят именно в SW (а не в обычный JS на странице).
-// --------------------------------------------------
-async function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) {
-    log('Service Worker не поддерживается в этом браузере.');
-    return null;
-  }
-
-  const reg = await navigator.serviceWorker.register('/sw.js');
-  log('SW зарегистрирован.');
-  return reg;
-}
-
-function log(msg) {
-  const el = $('#log');
-  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent;
-}
-
-async function ensurePushPermission() {
-  const perm = await Notification.requestPermission();
-  if (perm !== 'granted') {
-    throw new Error('Разрешение на уведомления не выдано');
-  }
-}
-
-// --------------------------------------------------
-// База (ПР16) + нужна для ПР17:
-// 1) просим разрешение Notifications
-// 2) берём VAPID public key с сервера
-// 3) создаём push-subscription в браузере
-// 4) отправляем subscription на сервер
-//
-// Без этого шагa сервер НЕ сможет отправить push позже,
-// потому что ему некуда отправлять (нет subscription).
-// --------------------------------------------------
 
 async function subscribePush(reg) {
   await ensurePushPermission();
