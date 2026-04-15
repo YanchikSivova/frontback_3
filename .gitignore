@@ -3,3 +3,5 @@ Thumbs.db
 .vscode/
 .idea/
 node_modules
+server/certs/localhost-key.pem
+server/certs/localhost-cert.pem
