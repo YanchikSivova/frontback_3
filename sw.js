@@ -10,7 +10,7 @@
  * Более продвинутые стратегии специально оставлены студентам как TODO.
  */
 
-const CACHE_NAME = 'practice-13-14-cache-v3';
+const CACHE_NAME = 'practice-13-14-cache-v5';
 const RUNTIME_CACHE = 'runtime-cache-v4';
 
 /**
@@ -98,31 +98,6 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// self.addEventListener('push', (event) => {
-//   let data = {};
-
-//   try {
-//     data = event.data.json();
-//   } catch {
-//     data = { title: 'Push', body: 'Нет данных' };
-//   }
-
-//   event.waitUntil(
-//     self.registration.showNotification(data.title, {
-//       body: data.body,
-//       icon: '/assets/icons/favicon-192x192.png',
-//       data: { url: data.url || '/' }
-//     })
-//   );
-// });
-
-// self.addEventListener('notificationclick', (event) => {
-//   event.notification.close();
-
-//   event.waitUntil(
-//     clients.openWindow(event.notification.data.url)
-//   );
-// });
 
 self.addEventListener('push', (event) => {
   // event.data — полезная нагрузка, которую сервер отправил через web-push.
